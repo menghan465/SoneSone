@@ -1,0 +1,1165 @@
+<!-- electron -->
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>莘莘入耳</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="../css/index.css">
+        <script type="module" src="../js/index.js"></script>
+        <script defer="defer" src="../js/renderer.js"></script>
+        <!-- <script type="module" src="../js/vosk.js"></script> -->
+        <!-- <script type="module" src="../js/vosk-browser.js"></script> -->
+        <meta http-equiv="Content-Security-Policy" content="style-src 'self' 'unsafe-inline';img-src 'self' data:;"/>
+</head>
+
+<body>
+    <div class="shell">
+        <ul class="nav">
+            <li class="active" id="logo">
+                <a href="#">
+                    <div class="icon">
+                        <div class="imageBox">
+                            <img src="../assets/img/logo.ico" alt="">
+                        </div>
+                    </div>
+                    <div class="text">莘莘入耳</div>
+                </a>
+            </li>
+            <li>
+                <a href="#home">
+                    <div class="icon">
+                        <i class="imageBox"><img src="../assets/img/模型搭建.png"/></i>
+                    </div>
+                    <div class="text">标准声音</div>
+                </a>
+            </li>
+            <li>
+                <a href="#theme">
+                    <div class="icon">
+                        <i class="imageBox"><img src="../assets/img/语音讲解.png"/></i>
+                    </div>
+                    <div class="text">语音讲解</div>
+                </a>
+            </li>
+            <li>
+                <a href="#wallet">
+                    <div class="icon">
+                        <i class="imageBox"><img src="../assets/img/课件制作.png"/></i>
+                    </div>
+                    <div class="text">有声课件</div>
+                </a>
+            </li>
+            <li>
+                <a href="#picture">
+                    <div class="icon">
+                        <i class="imageBox"><img src="../assets/img/字幕变音.png"/></i>
+                    </div>
+                    <div class="text">字幕变音</div>
+                </a>
+            </li>
+        </ul>
+    </div>
+    <section class="section mid" id="home">
+    <div class="container">
+        <div class="top">
+            <div class="left box">
+                <form class="file-upload-form">
+                    <label class="file-upload-label" for="audioFile">
+                      <div class="file-upload-design">
+                        <svg height="1em" viewBox="0 0 640 512">
+                          <path
+                            d="M144 480C64.5 480 0 415.5 0 336c0-62.8 40.2-116.2 96.2-135.9c-.1-2.7-.2-5.4-.2-8.1c0-88.4 71.6-160 160-160c59.3 0 111 32.2 138.7 80.2C409.9 102 428.3 96 448 96c53 0 96 43 96 96c0 12.2-2.3 23.8-6.4 34.6C596 238.4 640 290.1 640 352c0 70.7-57.3 128-128 128H144zm79-217c-9.4 9.4-9.4 24.6 0 33.9s24.6 9.4 33.9 0l39-39V392c0 13.3 10.7 24 24 24s24-10.7 24-24V257.9l39 39c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-80-80c-9.4-9.4-24.6-9.4-33.9 0l-80 80z"
+                          ></path>
+                        </svg>
+                        <span class="browse-button">Browse file</span>
+                      </div>
+                      <input type="file" id="audioFile" accept="audio/*">
+                    </label>
+                  </form>
+            </div>
+            <div class="right box">
+                <img id="3"class="wave-icon"style="height:170px;margin-left: 30px;"src="../assets/img/wave/3.png"/>
+                <img id="2"class="wave-icon"style="height:170px"src="../assets/img/wave/2.png"/>
+                <img id="1"class="wave-icon"style="height:170px"src="../assets/img/wave/1.png"/>
+                <button style="border: none;background-color: transparent;" id="microphoneIcon">
+                <img style="height:170px; cursor: pointer;" 
+                    src="../assets/img/模型搭建.png" 
+                    alt="Microphone Icon"
+                    class="record-btn"
+                    id="record-btn">
+                </button>
+            </div>
+        </div>
+        <div class="bottom box" >
+                    <div id="waveform"></div>
+                    <script type="module">
+                        // import WaveSurfer from 'https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/wavesurfer.esm.js'
+                        import WaveSurfer from '../js/wavesurfer.js';
+                        import {client} from '../js/gradio.js';
+                        // import Vosk from '../js/vosk-browser';
+                        // import { client } from "@gradio/client";
+                        // import { createRequire } from 'module';
+                        // const require = createRequire(import.meta.url);
+                        const fileInput = document.getElementById('audioFile');
+                        const fileInput2 = document.getElementById('original_audio');
+                        var wavesurfer = null; 
+                        var wavesurfer2 = null; 
+                        var file;
+                        var file2;
+                        let mediaRecorder = null;
+                        let audioChunks = [];
+                        let isRecording = false; // 记录是否正在录音
+                        let stream = null; // 用来存储用户的媒体流
+                        let animationInterval = null;
+                        let audioFileName = '';
+                        let original_audio='';
+                        const Microphone = document.getElementById('microphoneIcon');
+                        const recordBtn = document.getElementById('record-btn');
+                        const waveIcons = document.querySelectorAll('.wave-icon'); // 需要给每个波形图添加wave-icon类
+                        const waveImages = document.querySelectorAll('.wave-icon'); // 获取所有波形图元素
+                        let currentIndex = 2;
+                        var textarea = document.getElementById("text");
+                        // 修改后的动画控制函数
+                        function startAnimation() {
+                            if (animationInterval) return;
+                            animationInterval = setInterval(() => {
+                                // 重置所有图片为普通状态
+                                waveImages.forEach(img => {
+                                    img.src = img.src.replace('_a.png', '.png');
+                                });
+                                // 设置当前激活图片
+                                const currentImg = waveImages[currentIndex];
+                                currentImg.src = currentImg.src.replace('.png', '_a.png');
+                                // 延迟恢复当前图片
+                                setTimeout(() => {
+                                    currentImg.src = currentImg.src.replace('_a.png', '.png');
+                                }, 500); // 高亮持续时间
+                                // 更新索引
+                                currentIndex = (currentIndex - 1 + waveImages.length) % waveImages.length;
+                            }, 500); // 整体切换间隔
+                        }
+
+                        function stopAnimation() {
+                            if (animationInterval) {
+                                clearInterval(animationInterval);
+                                animationInterval = null;
+                                currentIndex = 2;
+                                // 重置所有图片为普通状态
+                                waveImages.forEach(img => {
+                                    img.src = img.src.replace('_a.png', '.png');
+                                });
+                            }
+                        }
+                        window.onload = async function() {
+                        // window.onload = function() {
+                            fileInput.addEventListener('change', function (e) {
+                                file = e.target.files[0];  // 获取选中的文件
+                                if (file) {
+                                    // 从上传的文件获取文件名
+                                    audioFileName = file.name;
+                                    console.log("上传的音频文件名:", audioFileName);
+                                    if (wavesurfer) {
+                                        wavesurfer.destroy();
+                                    }
+                                    wavesurfer = WaveSurfer.create({
+                                    container: '#waveform',
+                                    url: URL.createObjectURL(file),
+                                    waveColor: '#6d4cab',
+                                    progressColor: 'purple',
+                                    autoplay: true,
+                                    mediaControls: true,
+                                    height: 80,
+                                    // Set a bar width
+                                    barWidth: 2,
+                                    // Optionally, specify the spacing between bars
+                                    barGap: 1,
+                                    // And the bar radius
+                                    barRadius: 2
+                                    })
+                                    // 可选：加载完成提示
+                                    wavesurfer.on('ready', () => {
+                                    console.log("文件名称:",file.name);
+                                    console.log('音频时长:', wavesurfer.getDuration(), '秒')
+                                    })
+                                    wavesurfer.on('interaction', () => {
+                                        wavesurfer.play()
+                                    })
+                                }
+                            });
+
+                        // };
+                        fileInput2.addEventListener('change', function (e) {
+                                file2 = e.target.files[0];  // 获取选中的文件
+                                if (file2) {
+                                    // 从上传的文件获取文件名
+                                    original_audio = file2.name;
+                                    window.originalAudioFileName = file2.name;
+                                    console.log("上传的音频文件名:", original_audio);
+                                    if (wavesurfer2) {
+                                        wavesurfer2.destroy();
+                                    }
+                                    wavesurfer2 = WaveSurfer.create({
+                                    container: '#original_audio_waveform',
+                                    url: URL.createObjectURL(file2),
+                                    waveColor: '#6d4cab',
+                                    progressColor: 'purple',
+                                    autoplay: true,
+                                    // mediaControls: true,
+                                    height: 80,
+                                    // Set a bar width
+                                    barWidth: 2,
+                                    // Optionally, specify the spacing between bars
+                                    barGap: 1,
+                                    // And the bar radius
+                                    barRadius: 2
+                                    })
+                                    // 可选：加载完成提示
+                                    wavesurfer2.on('ready', () => {
+                                    console.log("文件名称:",file2.name);
+                                    console.log('音频时长:', wavesurfer2.getDuration(), '秒')
+                                    })
+                                    wavesurfer2.on('interaction', () => {
+                                        wavesurfer2.play()
+                                    })
+                                }
+                            });
+
+
+                            
+                        function getSelectedReferenceAudio() {
+                            const selectedInput = document.querySelector('#dynamic-options3 input[name="option"]:checked');
+                            if (!selectedInput) return null;
+                            
+                            return selectedInput.nextElementSibling.dataset.txt;
+                        }
+                        const app = await client("http://localhost:9872/");
+                        const Generate = document.getElementById('generate');   
+                        console.log('app对象是否存在:', typeof app); // 应为 "object"
+                        console.log('predict方法是否存在:', typeof app.predict); // 应为 "function"
+                        // window.onload = async function() {
+                            const result1 = await app.predict("/change_choices", ["default_value"]); 
+                            // console.log(result1.data[0].choices.map(choice => choice[0]));
+                            let result = result1.data[0].choices.map(choice => ({ value: choice[0], checked: false }))
+                            let gptresult = result1.data[1].choices.map(choice => ({ value: choice[1], checked: false }))
+                            // console.log(result);
+                            // console.log(gptresult);
+                            result[0].checked=true;
+                            gptresult[0].checked=true;
+
+                            const optionsData = result;
+                            const optionsData2 = gptresult;
+                            
+                            
+                            const optionsContainer = document.getElementById('dynamic-options');// 选项容器
+                            const optionsContainer2 = document.getElementById('dynamic-options2');
+                            const optionsContainer3 = document.getElementById('dynamic-options3');
+                            const modelSelectedElement = document.querySelector('.modelselected');
+                            const gptSelectedElement = document.querySelector('.gptselected');
+                            const fileSelectedElement = document.querySelector('.fileselected');
+                            
+                            // 清空容器
+                            optionsContainer.innerHTML = '';
+                            optionsContainer2.innerHTML = '';
+                            optionsContainer3.innerHTML = '';
+
+
+                            // 动态创建选项
+                            optionsData.forEach(option => {
+                                const wrapper = document.createElement('div');
+                                wrapper.title = option.value;
+                                
+                                // 创建radio input
+                                const input = document.createElement('input');
+                                input.type = 'radio';
+                                input.name = 'option';
+                                input.id = `option-${option.value}`;
+                                input.checked = option.checked;
+
+                                // 创建label
+                                const label = document.createElement('label');
+                                label.className = 'option';
+                                label.htmlFor = `option-${option.value}`;
+                                label.dataset.txt = option.value;
+                                label.style.width = '170px';
+                                label.style.fontSize='10px';
+                                // 添加点击事件（示例）
+                                label.addEventListener('click', async () => {
+                                    try {
+                                        const result = await app.predict("/change_choices", [option.value]);
+                                        // document.getElementById('result-container').textContent = 
+                                        //     `已选择：${option.value}`;
+                                         // 更新所有选项的选中状态
+                                        optionsData.forEach(opt => opt.checked = opt.value === option.value);
+                                        
+                                        // 更新伪元素内容
+                                        if (modelSelectedElement) {
+                                        modelSelectedElement.style.setProperty('--dynamic-content', `"${option.value}"`);
+                                        }
+                                        
+                                        // 同步更新radio的选中状态（可选）
+                                        const radio = document.getElementById(`option-${option.value}`);
+                                        if (radio) radio.checked = true;
+    
+                                    } catch (error) {
+                                        console.error('更新失败:', error);
+                                    }
+                                });
+
+                                // 组合元素
+                                wrapper.appendChild(input);
+                                wrapper.appendChild(label);
+                                optionsContainer.appendChild(wrapper);
+                            });
+
+
+
+
+
+
+                             // 动态创建选项
+                            optionsData2.forEach(option => {
+                                const wrapper2 = document.createElement('div');
+                                wrapper2.title = option.value;
+                                
+                                // 创建radio input
+                                const input2 = document.createElement('input');
+                                input2.type = 'radio';
+                                input2.name = 'option';
+                                input2.id = `option-${option.value}`;
+                                input2.checked = option.checked;
+
+                                // 创建label
+                                const label2 = document.createElement('label');
+                                label2.className = 'option';
+                                label2.htmlFor = `option-${option.value}`;
+                                label2.dataset.txt = option.value;
+                                label2.style.width = '170px';
+                                label2.style.fontSize='10px';
+                                // 添加点击事件（示例）
+                                label2.addEventListener('click', async () => {
+                                    try {
+                                        const result = await app.predict("/change_choices", [option.value]);
+                                        // document.getElementById('result-container').textContent = 
+                                        //     `已选择：${option.value}`;
+                                         // 更新所有选项的选中状态
+                                        optionsData2.forEach(opt => opt.checked = opt.value === option.value);
+                                        
+                                        // 更新伪元素内容
+                                        if (gptSelectedElement) {
+                                        gptSelectedElement.style.setProperty('--dynamic-content2', `"${option.value}"`);
+                                        }
+                                        
+                                        // 同步更新radio的选中状态（可选）
+                                        const radio = document.getElementById(`option-${option.value}`);
+                                        if (radio) radio.checked = true;
+    
+                                    } catch (error) {
+                                        console.error('更新失败:', error);
+                                    }
+                                });
+
+                                // 组合元素
+                                wrapper2.appendChild(input2);
+                                wrapper2.appendChild(label2);
+                                optionsContainer2.appendChild(wrapper2);
+                            });
+
+
+
+
+
+
+
+
+                                const relativePath = 'audio';
+                                const files = await window.electronAPI.getFiles(relativePath);
+                                if (files.error) {
+                                    console.error('读取错误:', files.error);
+                                } else {
+                                    console.log('文件列表:', files);
+                                    // document.getElementById('fileList').innerHTML = files.map(file => `<li>${file}</li>`).join('');
+                                }
+                                const fileList = Array.isArray(files) ? files : files.data || [];
+                                console.log('文件列表:', fileList);
+                                let fileresult = fileList.map(file => ({ 
+                                    value: file, 
+                                    checked: false 
+                                }));
+                                fileresult[0].checked=true;
+                                console.log(fileresult);
+                                const optionsData3 = fileresult;
+                                optionsData3.forEach(option => {
+                                const wrapper3 = document.createElement('div');
+                                wrapper3.title = option.value;
+                                
+                                // 创建radio input
+                                const input3 = document.createElement('input');
+                                input3.type = 'radio';
+                                input3.name = 'option';
+                                input3.id = `option-${option.value}`;
+                                input3.checked = option.checked;
+
+                                // 创建label
+                                const label3 = document.createElement('label');
+                                label3.className = 'option';
+                                label3.htmlFor = `option-${option.value}`;
+                                label3.dataset.txt = option.value;
+                                label3.style.width = '90px';
+                                label3.style.fontSize='10px';
+                                label3.addEventListener('click', async () => {
+                                    try {
+                                        optionsData3.forEach(opt => opt.checked = opt.value === option.value);
+                                        
+                                        // 更新伪元素内容
+                                        if (fileSelectedElement) {
+                                        fileSelectedElement.style.setProperty('--dynamic-content3', `"${option.value}"`);
+                                        }
+                                        
+                                        // 同步更新radio的选中状态（可选）
+                                        const radio = document.getElementById(`option-${option.value}`);
+                                        if (radio) radio.checked = true;
+    
+                                    } catch (error) {
+                                        console.error('更新失败:', error);
+                                    }
+                                });
+                                
+                                // 组合元素
+                                wrapper3.appendChild(input3);
+                                wrapper3.appendChild(label3);
+                                optionsContainer3.appendChild(wrapper3);
+                            });
+
+
+                        Generate.addEventListener("click",async function(e){
+                            const result2 = await app.predict("/toggle_user_uploaded_audio_visibility", [		
+                                true, // boolean  in '是否直接对上次合成结果调整语速和音色。防止随机性。' Checkbox component
+                            ]);
+                            const selectedAudio = getSelectedReferenceAudio();
+                            const usePreviousAudio = document.getElementById('previous_audio').checked;
+                            let Reference_Audio=null;
+                            if (!selectedAudio) {
+                                alert('请先选择参考音频');
+                                return;
+                            }
+                            if(usePreviousAudio){
+                                Reference_Audio=audioFileName;
+                            }
+                            else{
+                                Reference_Audio=selectedAudio;
+                            }
+                            console.log('正在使用参考音频：', Reference_Audio);
+                            let content =document.getElementById('text').value; // 最常用方式     
+                            console.log('需要合成的文本：', content);
+                            let reference_content =document.getElementById('referencetext').value;    
+                            console.log('参考音频的文本：', reference_content);
+                            const reference_language = document.querySelector('input[name="option4"]:checked').nextElementSibling.getAttribute('data-txt');
+                            const composite_language = document.querySelector('input[name="option4"]:checked').nextElementSibling.getAttribute('data-txt');
+                            const toneColorChange = document.getElementById('tone_color_change').checked;
+                            const originalAudioInput = document.getElementById('original_audio');
+                            if (toneColorChange && originalAudioInput) {
+                              // const model = await Vosk.createModel(path);
+                              // const recognizer = new model.KaldiRecognizer();
+                              // const audioContext = new AudioContext();
+                              // const recognizerNode = audioContext.createScriptProcessor(4096, 1, 1)
+                              // recognizerNode.onaudioprocess = (event) => {
+                              //     try {
+                              //         recognizer.acceptWaveform(audioStream)
+                              //     } catch (error) {
+                              //         console.error('acceptWaveform failed', error)
+                              //     }
+                              // }
+                              // const source = audioContext.createMediaStreamSource(mediaStream);
+                              // source.connect(recognizerNode);
+                              reference_content=window.runVosk(original_audio,"../../language/"+composite_language)
+                            }
+                            
+                            console.log('需要合成的文本：', reference_content);
+                            // const app = await client("http://localhost:9872/");
+                            // const result = await app.predict("/get_tts_wav", [
+                            //                 Reference_Audio, 	// blob in '请上传3~10秒内参考音频，超过会报错！' Audio component		
+                            //                 reference_content, // string  in '参考音频的文本' Textbox component		
+                            //                 reference_language, // string  in '参考音频的语种' Dropdown component		
+                            //                 content, // string  in '需要合成的文本' Textbox component		
+                            //                 composite_language, // string  in '需要合成的语种.限制范围越小判别效果越好。' Dropdown component		
+                            //                 "不切", // string  in '怎么切' Dropdown component		
+                            //                 1, // number (numeric value between 1 and 100) in 'top_k' Slider component		
+                            //                 0, // number (numeric value between 0 and 1) in 'top_p' Slider component		
+                            //                 0, // number (numeric value between 0 and 1) in 'temperature' Slider component		
+                            //                 true, // boolean  in '开启无参考文本模式。不填参考文本亦相当于开启。v3暂不支持该模式，使用了会报错。' Checkbox component		
+                            //                 0.6, // number (numeric value between 0.6 and 1.65) in '语速' Slider component		
+                            //                 true, // boolean  in '是否直接对上次合成结果调整语速和音色。防止随机性。' Checkbox component
+                            //                 None, 	// blob in '可选项：通过拖拽多个文件上传多个参考音频（建议同性），平均融合他们的音色。如不填写此项，音色由左侧单个参考音频控制。如是微调模型，建议参考音频全部在微调训练集音色内，底模不用管。' File component		
+                            //                 "4", // string  in '采样步数,如果觉得电,提高试试,如果觉得慢,降低试试' Radio component		
+                            //                 true, // boolean  in 'v3输出如果觉得闷可以试试开超分' Checkbox component		
+                            //                 0.1, // number (numeric value between 0.1 and 0.5) in '句间停顿秒数' Slider component
+                            //                 exampleAudio, 	// blob in '自定义上次合成结果（上传音频覆盖缓存）' Audio component  语音转语音
+                            //     ]);
+
+                            // console.log(result.data);
+
+
+                               
+                        });
+
+                        };
+
+
+
+                        Microphone.addEventListener('click', function(e) {
+                            if (isRecording) {
+                                // 如果正在录音，停止录音
+                                mediaRecorder.stop();
+                                recordBtn.src = '../assets/img/模型搭建.png';
+                                stopAnimation();
+                                console.log("end");
+                                isRecording = false;
+                            } else {
+                                // 如果没有在录音，获取用户媒体流
+                                navigator.mediaDevices.getUserMedia({ audio: true })
+                                    .then(newStream => {
+                                        // 如果 stream 为空或与上次获取的流不一样，则重新初始化 mediaRecorder
+                                        if (!stream || stream.id !== newStream.id) {
+                                            stream = newStream;
+                                            if (mediaRecorder) {
+                                                mediaRecorder.stop(); // 确保上一个 mediaRecorder 被停止
+                                            }
+                                            mediaRecorder = new MediaRecorder(stream);
+                                            audioChunks = [];
+                                            audioFileName = 'recorded_' + Date.now() + '.wav';
+                                            console.log("录音文件名:", audioFileName);
+                                            mediaRecorder.ondataavailable = event => {
+                                                audioChunks.push(event.data);
+                                            };
+                                            mediaRecorder.onstop = () => {
+                                                // 录音停止后，创建一个 Blob 对象，并生成音频的 URL
+                                                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); // 或者 'audio/mp3'
+                                                const audioUrl = URL.createObjectURL(audioBlob);
+                                                console.log("音频 URL:", audioUrl);
+
+                                                // 使用录音的音频 URL 创建 WaveSurfer 实例
+                                                if (wavesurfer) {
+                                                    wavesurfer.destroy(); // 清除上一个实例
+                                                }
+                                                wavesurfer = WaveSurfer.create({
+                                                    container: '#waveform',
+                                                    url: audioUrl, // 使用录音 URL，而不是文件输入的 URL
+                                                    waveColor: '#6d4cab',
+                                                    progressColor: 'purple',
+                                                    autoplay: true,
+                                                    mediaControls: true,
+                                                    height: 80,
+                                                    // Set a bar width
+                                                    barWidth: 2,
+                                                    // Optionally, specify the spacing between bars
+                                                    barGap: 1,
+                                                    // And the bar radius
+                                                    barRadius: 2
+                                                });
+
+                                                // 可选：加载完成提示
+                                                wavesurfer.on('ready', () => {
+                                                    console.log('音频时长:', wavesurfer.getDuration(), '秒');
+                                                });
+                                                wavesurfer.on('interaction', () => {
+                                                    wavesurfer.play();
+                                                });
+                                            };
+                                        }
+
+                                        // 开始录音
+                                        mediaRecorder.start();
+                                        recordBtn.src = '../assets/img/microphone.png';
+                                        startAnimation();
+                                        isRecording = true;
+                                        audioChunks = []; // 每次开始录音前清空上次的数据
+                                        console.log("start");
+                                    })
+                                    .catch(err => {
+                                        console.error("获取麦克风失败:", err);
+                                        recordBtn.src = '../assets/img/模型搭建.png';
+                                        stopAnimation();
+                                    });
+                            }
+
+
+
+
+                        });
+                        // console.log("所以当前音频的名称为:",audioFileName);
+
+
+                    </script>
+            <div id="playbackControls" style="text-align: center;background-color: transparent;">
+                <!-- <button id="playPauseButton" onclick="togglePlayback()" style="background-color: transparent;color: transparent;border: none;"><svg viewBox="0 0 384 512" height="1em" xmlns="http://www.w3.org/2000/svg" class="play"><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"></path></svg></button>
+                <a id="download" style="background-color: transparent;color: transparent;border: none;"><svg viewBox="0 0 24 24" height="1em" xmlns="http://www.w3.org/2000/svg" class="play"><path d="M14.29,17.29,13,18.59V13a1,1,0,0,0-2,0v5.59l-1.29-1.3a1,1,0,0,0-1.42,1.42l3,3a1,1,0,0,0,.33.21.94.94,0,0,0,.76,0,1,1,0,0,0,.33-.21l3-3a1,1,0,0,0-1.42-1.42ZM18.42,6.22A7,7,0,0,0,5.06,8.11,4,4,0,0,0,6,16a1,1,0,0,0,0-2,2,2,0,0,1,0-4A1,1,0,0,0,7,9a5,5,0,0,1,9.73-1.61,1,1,0,0,0,.78.67,3,3,0,0,1,.24,5.84,1,1,0,1,0,.5,1.94,5,5,0,0,0,.17-9.62Z"></path></svg></a> -->
+            </div>
+        </div>
+    </div>
+    </section>
+    <section class="section" id="theme">
+        <div>
+        <textarea name="text" 
+        id="text" 
+        style="width: 660px; height: 565px; overflow-y: auto; resize: none;font-family: 'Microsoft YaHei', sans-serif;border-radius: 10px;padding: 10px;border: 2px dashed #6d4cab;" 
+        spellcheck="false"
+        placeholder="需要合成的文本，按下ctrl+m键呼出快捷插入情绪工具"
+        ></textarea>
+        <div style="height: 75px;width: 660px;background-color: #fff;border: 2px dashed #6d4cab;border-radius: 10px;">
+            <img style="height: 50px;width: 50px;position:relative;
+            left: 50%;
+            transform: translateX(-50%);" src="../assets/img/voice.png"/>
+            <div style="position:relative;text-align: center;color: #6d4cab;bottom: 5px;">生成音频输出</div>
+        </div>
+        </div>
+        </div>
+        <div style="margin-left: 4px;height: 640px;">
+        <div class="button-container" style="vertical-align: top;">
+            <div class="custom-tooltip">
+            <button class="button left" onclick="showPanel('A')">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="1em"
+                height="1em"
+                viewBox="0 0 1024 1024"
+                stroke-width="0"
+                fill="currentColor"
+                stroke="currentColor"
+                class="icon"
+                style="color: white;min-width: 30px;"
+              >
+                <path
+                  d="M946.5 505L560.1 118.8l-25.9-25.9a31.5 31.5 0 0 0-44.4 0L77.5 505a63.9 63.9 0 0 0-18.8 46c.4 35.2 29.7 63.3 64.9 63.3h42.5V940h691.8V614.3h43.4c17.1 0 33.2-6.7 45.3-18.8a63.6 63.6 0 0 0 18.7-45.3c0-17-6.7-33.1-18.8-45.2zM568 868H456V664h112v204zm217.9-325.7V868H632V640c0-22.1-17.9-40-40-40H432c-22.1 0-40 17.9-40 40v228H238.1V542.3h-96l370-369.7 23.1 23.1L882 542.3h-96.1z"
+                ></path>
+              </svg>
+            </button>
+            <span class="tooltip-text">模型音频等基础设置</span>
+            </div>
+            <div class="custom-tooltip">
+            <button class="button right" onclick="showPanel('B')">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="1em"
+                height="1em"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                fill="none"
+                stroke="currentColor"
+                class="icon"
+                style="color: white;min-width: 30px;"
+              >
+                <g>
+                  <path stroke-linejoin="round" stroke-linecap="round" stroke-width="1.5" stroke="currentColor" d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"></path>
+                  <path stroke-linejoin="round" stroke-linecap="round" stroke-width="1.5" stroke="currentColor" d="M19.4 15C19.2669 15.3016 19.2272 15.6362 19.286 15.9606C19.3448 16.285 19.4995 16.5843 19.73 16.82L19.79 16.88C19.976 17.0657 20.1235 17.2863 20.2241 17.5291C20.3248 17.7719 20.3766 18.0322 20.3766 18.295C20.3766 18.5578 20.3248 18.8181 20.2241 19.0609C20.1235 19.3037 19.976 19.5243 19.79 19.71C19.6043 19.896 19.3837 20.0435 19.1409 20.1441C18.8981 20.2448 18.6378 20.2966 18.375 20.2966C18.1122 20.2966 17.8519 20.2448 17.6091 20.1441C17.3663 20.0435 17.1457 19.896 16.96 19.71L16.9 19.65C16.6643 19.4195 16.365 19.2648 16.0406 19.206C15.7162 19.1472 15.3816 19.1869 15.08 19.32C14.7842 19.4468 14.532 19.6572 14.3543 19.9255C14.1766 20.1938 14.0813 20.5082 14.08 20.83V21C14.08 21.5304 13.8693 22.0391 13.4942 22.4142C13.1191 22.7893 12.6104 23 12.08 23C11.5496 23 11.0409 22.7893 10.6658 22.4142C10.2907 22.0391 10.08 21.5304 10.08 21V20.91C10.0723 20.579 9.96512 20.258 9.77251 19.9887C9.5799 19.7194 9.31074 19.5143 9 19.4C8.69838 19.2669 8.36381 19.2272 8.03941 19.286C7.71502 19.3448 7.41568 19.4995 7.18 19.73L7.12 19.79C6.93425 19.976 6.71368 20.1235 6.47088 20.2241C6.22808 20.3248 5.96783 20.3766 5.705 20.3766C5.44217 20.3766 5.18192 20.3248 4.93912 20.2241C4.69632 20.1235 4.47575 19.976 4.29 19.79C4.10405 19.6043 3.95653 19.3837 3.85588 19.1409C3.75523 18.8981 3.70343 18.6378 3.70343 18.375C3.70343 18.1122 3.75523 17.8519 3.85588 17.6091C3.95653 17.3663 4.10405 17.1457 4.29 16.96L4.35 16.9C4.58054 16.6643 4.73519 16.365 4.794 16.0406C4.85282 15.7162 4.81312 15.3816 4.68 15.08C4.55324 14.7842 4.34276 14.532 4.07447 14.3543C3.80618 14.1766 3.49179 14.0813 3.17 14.08H3C2.46957 14.08 1.96086 13.8693 1.58579 13.4942C1.21071 13.1191 1 12.6104 1 12.08C1 11.5496 1.21071 11.0409 1.58579 10.6658C1.96086 10.2907 2.46957 10.08 3 10.08H3.09C3.42099 10.0723 3.742 9.96512 4.0113 9.77251C4.28059 9.5799 4.48572 9.31074 4.6 9C4.73312 8.69838 4.77282 8.36381 4.714 8.03941C4.65519 7.71502 4.50054 7.41568 4.27 7.18L4.21 7.12C4.02405 6.93425 3.87653 6.71368 3.77588 6.47088C3.67523 6.22808 3.62343 5.96783 3.62343 5.705C3.62343 5.44217 3.67523 5.18192 3.77588 4.93912C3.87653 4.69632 4.02405 4.47575 4.21 4.29C4.39575 4.10405 4.61632 3.95653 4.85912 3.85588C5.10192 3.75523 5.36217 3.70343 5.625 3.70343C5.88783 3.70343 6.14808 3.75523 6.39088 3.85588C6.63368 3.95653 6.85425 4.10405 7.04 4.29L7.1 4.35C7.33568 4.58054 7.63502 4.73519 7.95941 4.794C8.28381 4.85282 8.61838 4.81312 8.92 4.68H9C9.29577 4.55324 9.54802 4.34276 9.72569 4.07447C9.90337 3.80618 9.99872 3.49179 10 3.17V3C10 2.46957 10.2107 1.96086 10.5858 1.58579C10.9609 1.21071 11.4696 1 12 1C12.5304 1 13.0391 1.21071 13.4142 1.58579C13.7893 1.96086 14 2.46957 14 3V3.09C14.0013 3.41179 14.0966 3.72618 14.2743 3.99447C14.452 4.26276 14.7042 4.47324 15 4.6C15.3016 4.73312 15.6362 4.77282 15.9606 4.714C16.285 4.65519 16.5843 4.50054 16.82 4.27L16.88 4.21C17.0657 4.02405 17.2863 3.87653 17.5291 3.77588C17.7719 3.67523 18.0322 3.62343 18.295 3.62343C18.5578 3.62343 18.8181 3.67523 19.0609 3.77588C19.3037 3.87653 19.5243 4.02405 19.71 4.21C19.896 4.39575 20.0435 4.61632 20.1441 4.85912C20.2448 5.10192 20.2966 5.36217 20.2966 5.625C20.2966 5.88783 20.2448 6.14808 20.1441 6.39088C20.0435 6.63368 19.896 6.85425 19.71 7.04L19.65 7.1C19.4195 7.33568 19.2648 7.63502 19.206 7.95941C19.1472 8.28381 19.1869 8.61838 19.32 8.92V9C19.4468 9.29577 19.6572 9.54802 19.9255 9.72569C20.1938 9.90337 20.5082 9.99872 20.83 10H21C21.5304 10 22.0391 10.2107 22.4142 10.5858C22.7893 10.9609 23 11.4696 23 12C23 12.5304 22.7893 13.0391 22.4142 13.4142C22.0391 13.7893 21.5304 14 21 14H20.91C20.5882 14.0013 20.2738 14.0966 20.0055 14.2743C19.7372 14.452 19.5268 14.7042 19.4 15Z"></path>
+                </g>
+                <defs>
+                  <clipPath id="clip0_1683_1163">
+                    <rect fill="white" height="24" width="24"></rect>
+                  </clipPath>
+                </defs>
+              </svg>
+            </button>
+            <span class="tooltip-text">其他设置选项</span>
+            </div>
+          </div>
+          
+
+
+
+          <div style="position: relative; height:560px; margin-top: 4px;width: 200px;">
+            <!-- A面 (默认显示) -->
+            <div id="panelA" style="height:100%; background-color: #fff; border-radius: 10px; border: 1px solid;border: 2px dashed #6d4cab;">
+                <div style="margin-top: 12px;">
+                    <div class="custom-tooltip">
+                        <p style="color: #6d4cab;margin-left: 10px;" id="result-container">SOVICS模型选用</p>
+                        <!-- <span class="tooltip-text">去噪的过程就被称为采样，不同的采样方法就表示不同的去噪方式，要进行去噪的次数，就是采样步数</span> -->
+                    </div>
+                    <div class="select">
+                        <div style="width: 180px;" class="modelselected">
+                          <svg class="arrow" viewBox="0 0 24 24">
+                            <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                          </svg>
+                        </div>
+                        <!-- 选项容器 -->
+                        <div style="width: 180px;height: 500px;overflow-y: scroll;overflow-x: hidden;z-index: 3;" class="options" id="dynamic-options"></div>
+                            <style>
+                                #dynamic-options::-webkit-scrollbar {
+                                width: 0; /* 隐藏滚动栏 */
+                                background: transparent; /* 背景透明 */
+                                }
+                            </style>
+                        </div>
+                </div>
+                <div style="margin-top: 17px;">
+                    <div class="custom-tooltip">
+                        <p style="color: #6d4cab;margin-left: 10px;" id="result-container">GPT模型选用</p>
+                        <!-- <span class="tooltip-text">去噪的过程就被称为采样，不同的采样方法就表示不同的去噪方式，要进行去噪的次数，就是采样步数</span> -->
+                    </div>
+                    <div class="select">
+                        <div style="width: 180px;" class="gptselected">
+                          <svg class="arrow" viewBox="0 0 24 24">
+                            <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                          </svg>
+                        </div>
+                        <!-- 选项容器 -->
+                        <div style="width: 180px;height: 500px;overflow-y: scroll;overflow-x: hidden;z-index: 3;" class="options" id="dynamic-options2"></div>
+                        <style>
+                            #dynamic-options2::-webkit-scrollbar {
+                              width: 0; /* 隐藏滚动栏 */
+                              background: transparent; /* 背景透明 */
+                            }
+                        </style>
+                    </div>
+                </div>
+                <div style="display: flex;margin-top: 27px;">
+                    <div class="custom-tooltip">
+                        <p style="color: #6d4cab;margin-left: 10px;">参考音频</p>
+                        <!-- <span class="tooltip-text">去噪的过程就被称为采样，不同的采样方法就表示不同的去噪方式，要进行去噪的次数，就是采样步数</span> -->
+                    </div>
+                    <div class="select">
+                        <div class="fileselected">
+                          <svg class="arrow" viewBox="0 0 24 24">
+                            <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                          </svg>
+                        </div>
+                        
+                        <!-- 选项容器 -->
+                        <div style="width: 100px;height: 200px;overflow-y: scroll;overflow-x: hidden;z-index: 3;" class="options" id="dynamic-options3"></div>
+                                    <style>
+                                    #dynamic-options3::-webkit-scrollbar {
+                                    width: 0; /* 隐藏滚动栏 */
+                                    background: transparent; /* 背景透明 */
+                                    }
+                            </style>
+                        </div>
+                    </div>
+                    <label class="cyberpunk-checkbox-label" style="margin-left: 10px;margin-top: 16px;"><input id="previous_audio" type="checkbox" class="cyberpunk-checkbox"><div class="custom-tooltip">使用录音或上传音频
+                        <!-- <span class="tooltip-text">音频后处理增强功能，主要用于提升合成语音的清晰度和音质。</span>--></div></label> 
+                        <div style="display: flex;margin-top: 22px;">
+                            <div class="custom-tooltip">
+                                <p style="color: #6d4cab;margin-left: 10px;">参考语种</p>
+                                <span class="tooltip-text">即参考音频的文本语种</span>
+                            </div>
+                            <div class="select">
+                                <div class="referencetextselected">
+                                  <svg class="arrow" viewBox="0 0 24 24">
+                                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                                  </svg>
+                                </div>
+                                
+                                <div class="options">
+                                  <div title="中文">
+                                    <input id="option4-中文" name="option4" type="radio"  checked />
+                                    <label class="option" for="option4-中文" data-txt="中文"></label>
+                                  </div>
+                                  <div title="英文">
+                                    <input id="option4-英文" name="option4" type="radio" />
+                                    <label class="option" for="option4-英文" data-txt="英文"></label>
+                                  </div>
+                                  <div title="日文">
+                                    <input id="option4-日文" name="option4" type="radio" />
+                                    <label class="option" for="option4-日文" data-txt="日文"></label>
+                                  </div>
+                                  <div title="粤语">
+                                    <input id="option4-粤语" name="option4" type="radio"/>
+                                    <label class="option" for="option4-粤语" data-txt="粤语"></label>
+                                  </div>
+                                  <div title="韩文">
+                                    <input id="option4-韩文" name="option4" type="radio" />
+                                    <label class="option" for="option4-韩文" data-txt="韩文"></label>
+                                  </div>
+                                  <div title="中英混合">
+                                    <input id="option4-中英混合" name="option4" type="radio" />
+                                    <label class="option" for="option4-中英混合" data-txt="中英混合"></label>
+                                  </div>
+                                  <div title="日英混合">
+                                    <input id="option4-日英混合" name="option4" type="radio" />
+                                    <label class="option" for="option4-日英混合" data-txt="日英混合"></label>
+                                  </div>
+                                  <div title="粤英混合">
+                                    <input id="option4-粤英混合" name="option4" type="radio" />
+                                    <label class="option" for="option4-粤英混合" data-txt="粤英混合"></label>
+                                  </div>
+                                  <div title="韩英混合">
+                                    <input id="option4-韩英混合" name="option4" type="radio" />
+                                    <label class="option" for="option4-韩英混合" data-txt="韩英混合"></label>
+                                  </div>
+                                  <div title="多语种混合">
+                                    <input id="option4-多语种混合" name="option4" type="radio" />
+                                    <label class="option" for="option4-多语种混合" data-txt="多语种混合"></label>
+                                  </div>
+                                  <div title="多语种混合(粤语)">
+                                    <input id="option4-多语种混合(粤语)" name="option4" type="radio" />
+                                    <label class="option" for="option4-多语种混合(粤语)" data-txt="多语种混合(粤语)"></label>
+                                  </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex;margin-top: 22px;">
+                            <div class="custom-tooltip">
+                                <p style="color: #6d4cab;margin-left: 10px;">合成语种</p>
+                                <span class="tooltip-text">即合成音频的文本语种</span>
+                            </div>
+                            <div class="select">
+                                <div class="compositetextselected">
+                                  <svg class="arrow" viewBox="0 0 24 24">
+                                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                                  </svg>
+                                </div>
+                                
+                                <div class="options">
+                                  <div title="中文">
+                                    <input id="option5-中文" name="option5" type="radio"  checked />
+                                    <label class="option" for="option5-中文" data-txt="中文"></label>
+                                  </div>
+                                  <div title="英文">
+                                    <input id="option5-英文" name="option5" type="radio" />
+                                    <label class="option" for="option5-英文" data-txt="英文"></label>
+                                  </div>
+                                  <div title="日文">
+                                    <input id="option5-日文" name="option5" type="radio" />
+                                    <label class="option" for="option5-日文" data-txt="日文"></label>
+                                  </div>
+                                  <div title="粤语">
+                                    <input id="option5-粤语" name="option5" type="radio"/>
+                                    <label class="option" for="option5-粤语" data-txt="粤语"></label>
+                                  </div>
+                                  <div title="韩文">
+                                    <input id="option5-韩文" name="option5" type="radio" />
+                                    <label class="option" for="option5-韩文" data-txt="韩文"></label>
+                                  </div>
+                                  <div title="中英混合">
+                                    <input id="option5-中英混合" name="option5" type="radio" />
+                                    <label class="option" for="option5-中英混合" data-txt="中英混合"></label>
+                                  </div>
+                                  <div title="日英混合">
+                                    <input id="option5-日英混合" name="option5" type="radio" />
+                                    <label class="option" for="option5-日英混合" data-txt="日英混合"></label>
+                                  </div>
+                                  <div title="粤英混合">
+                                    <input id="option5-粤英混合" name="option5" type="radio" />
+                                    <label class="option" for="option5-粤英混合" data-txt="粤英混合"></label>
+                                  </div>
+                                  <div title="韩英混合">
+                                    <input id="option5-韩英混合" name="option5" type="radio" />
+                                    <label class="option" for="option5-韩英混合" data-txt="韩英混合"></label>
+                                  </div>
+                                  <div title="多语种混合">
+                                    <input id="option5-多语种混合" name="option5" type="radio" />
+                                    <label class="option" for="option5-多语种混合" data-txt="多语种混合"></label>
+                                  </div>
+                                  <div title="多语种混合(粤语)">
+                                    <input id="option5-多语种混合(粤语)" name="option5" type="radio" />
+                                    <label class="option" for="option5-多语种混合(粤语)" data-txt="多语种混合(粤语)"></label>
+                                  </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex;margin-top: 22px;">
+                            <div class="custom-tooltip">
+                                <p style="color: #6d4cab;margin-left: 10px;">怎么切分</p>
+                                <!-- <span class="tooltip-text">即合成音频的文本语种</span> -->
+                            </div>
+                            <div class="select">
+                                <div class="howtocutselected">
+                                  <svg class="arrow" viewBox="0 0 24 24">
+                                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                                  </svg>
+                                </div>
+                                
+                                <div class="options">
+                                  <div title="不切">
+                                    <input id="option6-不切" name="option6" type="radio"/>
+                                    <label class="option" for="option6-不切" data-txt="不切"></label>
+                                  </div>
+                                  <div title="凑四句一切">
+                                    <input id="option6-凑四句一切" name="option6" type="radio"  checked />
+                                    <label class="option" for="option6-凑四句一切" data-txt="凑四句一切"></label>
+                                  </div>
+                                  <div title="凑50字一切">
+                                    <input id="option6-凑50字一切" name="option6" type="radio"/>
+                                    <label class="option" for="option6-凑50字一切" data-txt="凑50字一切"></label>
+                                  </div>
+                                  <div title="按中文句号。切">
+                                    <input id="option6-按中文句号。切" name="option6" type="radio"/>
+                                    <label class="option" for="option6-按中文句号。切" data-txt="按中文句号。切"></label>
+                                  </div>
+                                  <div title="按英文句号.切">
+                                    <input id="option6-按英文句号.切" name="option6" type="radio"/>
+                                    <label class="option" for="option6-按英文句号.切" data-txt="按英文句号.切"></label>
+                                  </div>
+                                  <div title="按标点符号切">
+                                    <input id="option6-按标点符号切" name="option6" type="radio"/>
+                                    <label class="option" for="option6-按标点符号切" data-txt="按标点符号切"></label>
+                                  </div>
+                                </div>
+                            </div>
+                        </div>
+                        <label class="cyberpunk-checkbox-label" style="margin-left: 10px;margin-top: 10px;"><input id="tone_color_change" type="checkbox" class="cyberpunk-checkbox"><div class="custom-tooltip">音频音色变化功能
+                            <span class="tooltip-text">“其他设置选项>调整语速和音色”打开后启动可以使用，开启后需填写原音频的文本作为合成文本，仅在该功能下可使用无合成文本模式</span></div></label> 
+                            <label class="open-file" style="color:#fff;margin-top: 8px;background-color:#6d4cab;margin-left: 30px;" for="original_audio">
+                                <input type="file" id="original_audio" hidden accept="audio/*">
+                                <span class="file-wrapper">
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="#fff" viewBox="0 0 71 67">
+                                    <path
+                                      stroke-width="5"
+                                      stroke="black"
+                                      d="M41.7322 11.7678L42.4645 12.5H43.5H68.5V64.5H2.5V2.5H32.4645L41.7322 11.7678Z"
+                                    ></path>
+                                  </svg>
+                                  <span class="file-front"></span>
+                                </span>
+                                Open file
+                            </label>
+                            <div id="original_audio_waveform" style="border: 1px dashed #6d4cab;height: 80px;margin-top: 3px;"></div>
+                            <label class="cyberpunk-checkbox-label" style="margin-left: 10px;margin-top: 3px;"><input id="tone_color_change" type="checkbox" class="cyberpunk-checkbox"><div class="custom-tooltip">无合成文本模式
+                                <!-- <span class="tooltip-text">“其他设置选项>调整语速和音色”打开后启动可以使用，开启后无需填写合成文本，因为合成文本与参考文本一致，但需要上传原音频</span> -->
+                            </div></label> 
+            </div>
+            <!-- B面 (默认隐藏) -->
+            <div id="panelB" style="height:100%; background-color: #fff; border-radius: 10px; border: 1px solid; display: none;border: 2px dashed #6d4cab;">
+                        <div style="display: flex;margin-top: 27px;">
+                            <p style="color: #6d4cab;margin-left: 10px;">音量</p>
+                            <input class="scrollbar" type="range" id="sound" value="0.50" min="0" max="1.00" step="0.01" onchange="changeV()">
+                        </div>
+                        <div style="display: flex;margin-top: 27px;">
+                            <p style="color: #6d4cab;margin-left: 10px;">语速</p>
+                            <input class="scrollbar" type="range" id="speed" value="1" min="0.6" max="1.65" step="0.05" onchange="changeV()">
+                        </div>
+                        <div style="display: flex;margin-top: 27px;">
+                            <p style="color: #6d4cab;margin-left: 10px;">停顿</p>
+                            <input class="scrollbar" type="range" id="pause_second" value="0.3" min="0.1" max="0.5" step="0.01" onchange="changeV()">
+                        </div>
+                        <div style="display: flex;margin-top: 27px;">
+                            <div class="custom-tooltip">
+                            <p style="color: #6d4cab;margin-left: 10px;">温度</p>
+                            <span class="tooltip-text">在语音合成中，温度帮助控制生成的多样性和预测性：低温度让语音听起来更加自然和一致，而高温度让语音更加多样和不可预测。</span>
+                            </div>
+                            <input class="scrollbar" type="range" id="temperature" value="1" min="0" max="1" step="0.1" onchange="changeV()">
+                        </div>
+                        <div style="display: flex;margin-top: 27px;">
+                            <div class="custom-tooltip">
+                            <p style="color: #6d4cab;margin-left: 10px;">top_k</p>
+                            <span class="tooltip-text">在语音合成中，Top-k 采样帮助模型在生成时从最可能的选项中选择，从而使生成的语音更加连贯和可理解，但也可能减少其多样性。</span>
+                            </div>
+                            <input class="scrollbar" type="range" id="top_k" value="15" min="1" max="100" step="1" onchange="changeV()">
+                        </div>
+                        <div style="display: flex;margin-top: 27px;">
+                            <div class="custom-tooltip">
+                            <p style="color: #6d4cab;margin-left: 10px;">top_p</p>
+                            <span class="tooltip-text">在语音合成中，Top-p 采样让模型根据当前的情况决定考虑多少可能的选项，既保持了内容的相关性，又允许了一定程度的创新和多样性。</span>
+                            </div>
+                            <input class="scrollbar" type="range" id="top_p" value="1" min="0" max="1" step="0.01" onchange="changeV()">
+                        </div>
+                        <div style="display: flex;margin-top: 27px;">
+                            <div class="custom-tooltip">
+                                <p style="color: #6d4cab;margin-left: 10px;">采样步数</p>
+                                <span class="tooltip-text">去噪的过程就被称为采样，不同的采样方法就表示不同的去噪方式，要进行去噪的次数，就是采样步数</span>
+                            </div>
+                            <div class="select">
+                                <div class="selected">
+                                  <svg class="arrow" viewBox="0 0 24 24">
+                                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                                  </svg>
+                                </div>
+                                
+                                <div class="options">
+                                  <div title="4">
+                                    <input id="option1-4" name="option1" type="radio" />
+                                    <label class="option" for="option1-4" data-txt="4"></label>
+                                  </div>
+                                  <div title="8">
+                                    <input id="option1-8" name="option1" type="radio" />
+                                    <label class="option" for="option1-8" data-txt="8"></label>
+                                  </div>
+                                  <div title="16">
+                                    <input id="option1-16" name="option1" type="radio" />
+                                    <label class="option" for="option1-16" data-txt="16"></label>
+                                  </div>
+                                  <div title="32">
+                                    <input id="option1-32" name="option1" type="radio" checked />
+                                    <label class="option" for="option1-32" data-txt="32"></label>
+                                  </div>
+                                  <div title="64">
+                                    <input id="option1-64" name="option1" type="radio" />
+                                    <label class="option" for="option1-64" data-txt="64"></label>
+                                  </div>
+                                  <div title="128">
+                                    <input id="option1-128" name="option1" type="radio" />
+                                    <label class="option" for="option1-128" data-txt="128"></label>
+                                  </div>
+                                </div>
+                            </div>
+                        </div>
+                        <label class="cyberpunk-checkbox-label" style="margin-left: 10px;margin-top: 25px;"><input id="if_freeze" type="checkbox" class="cyberpunk-checkbox"><div class="custom-tooltip">调整语速和音色
+                            <span class="tooltip-text">直接对上次合成结果调整语速和音色。防止随机性。该项启动方可进行音色变换功能。</span></div></label>
+                        <label class="cyberpunk-checkbox-label" style="margin-left: 10px;margin-top: 25px;"><input id="if_sr" type="checkbox" class="cyberpunk-checkbox"><div class="custom-tooltip">超分选项
+                            <span class="tooltip-text">音频后处理增强功能，主要用于提升合成语音的清晰度和音质。</span></div></label>
+                        <label class="cyberpunk-checkbox-label" style="margin-left: 10px;margin-top: 25px;"><input id="ref_free" type="checkbox" class="cyberpunk-checkbox" checked><div class="custom-tooltip">无参考文本模式
+                            <!-- <span class="tooltip-text">音频后处理增强功能，主要用于提升合成语音的清晰度和音质。</span>--></div></label> 
+                        <textarea name="referencetext" 
+                        id="referencetext" 
+                        style="width: 190px; height: 70px; overflow-y: auto; resize: none;font-family: 'Microsoft YaHei', sans-serif;border-radius: 10px;padding: 10px;border: 1px dashed #c0bef4;margin-left: 3px;margin-top: 3px;" 
+                        spellcheck="false"
+                        placeholder="此处请填写参考文本"
+                        ></textarea>
+                    <script>
+
+                        function showPanel(panelId) {
+                            // 获取 A 页和 B 页的元素
+                            const panelA = document.getElementById('panelA'); // 修改元素ID
+                            const panelB = document.getElementById('panelB'); // 修改元素ID
+
+                            // 根据传入的参数切换页面显示状态
+                            if (panelId === 'A') {
+                                panelA.style.display = 'block';
+                                panelB.style.display = 'none';
+                            } else if (panelId === 'B') {
+                                panelA.style.display = 'none';
+                                panelB.style.display = 'block';
+                            }
+                        }
+                        const select = document.querySelector('.select');
+                        const options = document.querySelector('.options');
+                        let hideTimeout = null;
+
+                        // 鼠标离开 .select 时，延迟隐藏
+                        select.addEventListener('mouseleave', () => {
+                        hideTimeout = setTimeout(() => {
+                            options.style.opacity = '0';
+                            options.style.pointerEvents = 'none';
+                            options.style.top = '25px'; // 恢复初始位置
+                        }, 300); // 延迟 0.3 秒
+                        });
+
+                        // 鼠标再次进入时，取消隐藏
+                        select.addEventListener('mouseenter', () => {
+                        clearTimeout(hideTimeout);
+                        options.style.opacity = '1';
+                        options.style.pointerEvents = 'auto';
+                        options.style.top = '35px';
+                        });
+
+
+
+                        // 在页面加载时初始化滑动条的进度
+                        window.addEventListener('DOMContentLoaded', () => {
+                            initProgress('sound');
+                            initProgress('speed');
+                            initProgress('top_k');
+                            initProgress('top_p');
+                            initProgress('temperature');
+                            initProgress('pause_second');
+                        });
+                        
+                        function initProgress(id) {
+                            const slider = document.getElementById(id);
+                            updateProgress(slider);
+                        }
+                        
+                        function changeV() {
+                            // 其他原有逻辑...
+                            updateProgress(document.getElementById('sound'));
+                            updateProgress(document.getElementById('speed'));
+                            updateProgress(document.getElementById('top_k'));
+                            updateProgress(document.getElementById('top_p'));
+                            updateProgress(document.getElementById('temperature'));
+                            updateProgress(document.getElementById('pause_second'));
+                            updateTooltipPosition({ target: event.target }); // 实时更新数值
+                        }
+                        
+                        function updateProgress(slider) {
+                            const value = parseFloat(slider.value);
+                            const min = parseFloat(slider.min);
+                            const max = parseFloat(slider.max);
+                            const percent = ((value - min) / (max - min) * 100) + '%';
+                            slider.style.setProperty('--progress', percent);
+                        }
+
+
+
+
+
+
+                        // 在全局添加工具提示元素
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'slider-value-tooltip';
+                        document.body.appendChild(tooltip);
+
+                        // 为所有滑动条绑定事件
+                        document.querySelectorAll('.scrollbar').forEach(slider => {
+                            // 鼠标事件
+                            slider.addEventListener('mousemove', updateTooltipPosition);
+                            slider.addEventListener('mouseenter', showTooltip);
+                            slider.addEventListener('mouseleave', hideTooltip);
+                            
+                            // 触摸设备支持
+                            slider.addEventListener('touchstart', showTooltip);
+                            slider.addEventListener('touchend', hideTooltip);
+                            slider.addEventListener('touchmove', updateTooltipPosition);
+                        });
+
+                        function showTooltip(e) {
+                            tooltip.style.opacity = '1';
+                            updateTooltipPosition(e);
+                        }
+
+                        function hideTooltip() {
+                            tooltip.style.opacity = '0';
+                        }
+
+                        function updateTooltipPosition(e) {
+                            const slider = e.target;
+                            const rect = slider.getBoundingClientRect();
+                            const value = parseFloat(slider.value).toFixed(2);
+                            
+                            // 计算滑块相对位置
+                            const percent = (slider.value - slider.min) / (slider.max - slider.min);
+                            const thumbPos = rect.left + percent * rect.width;
+                            
+                            // 更新提示框
+                            tooltip.textContent = value;
+                            tooltip.style.left = `${thumbPos}px`;
+                            tooltip.style.top = `${rect.top - 30}px`;
+                        }
+                    </script>
+            </div>
+          </div>
+          <button id="generate" style="height:30px;width:200px;margin-top: 4px;background-color: #6d4cab;color: #fff;border-radius: 5px;border: #6d4cab;">生成</button>
+        </div>
+        <script type="module">
+            function showPanel(panelId) {
+              const panelA = document.getElementById('panelA');
+              const panelB = document.getElementById('panelB');
+              
+              panelA.style.display = panelId === 'A' ? 'block' : 'none';
+              panelB.style.display = panelId === 'B' ? 'block' : 'none';
+            }
+        </script>
+        </div>
+        </div>
+    </section>
+    <section class="section" id="wallet">
+       
+    </section>
+    <section class="section" id="picture">picture</section>
+</body>
+
+
+
+
+
+<script type="module">
+
+    let nav = document.querySelectorAll(".nav li");
+    function activeLink() {
+        nav.forEach((item) => item.classList.remove("active"));
+        this.classList.add("active");
+    }
+    nav.forEach((item) => item.addEventListener("click", activeLink));
+
+
+</script>
+</html>
